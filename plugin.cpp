@@ -1445,7 +1445,7 @@ static void remove_rsb_flush()
 	while ( true )
 	{
 #if IDP_INTERFACE_VERSION>=900
-		iterator = bin_search3(
+		iterator = bin_search(
 #else
 		iterator = bin_search2(
 #endif
@@ -1525,10 +1525,24 @@ struct ntrays : plugmod_t
 	netnode nn = { "$ ntrays", 0, true };
 	hex::component_list components{ component_list };
 
-	void set_state( bool s ) 
+	bool should_enable() const
+	{
+		switch (nn.altval(0))
+		{
+			case 0:
+				return inf_get_filetype() == f_PE;
+			case 2:
+				return true;
+			default:
+				return false;
+		}
+	}
+
+	void set_enabled( bool s ) 
 	{
 		if ( s )
 		{
+			msg("Enabling NtRays\n");
 			remove_rsb_flush();
 			create_kuser_seg();
 			fix_udts();
@@ -1538,13 +1552,14 @@ struct ntrays : plugmod_t
 		}
 		else
 		{
+			msg("Disabling NtRays\n");
 			for ( const auto &desc : action_descs )
 				unregister_action(desc.name);
 		}
 		components.set_state( s );
 	}
-	ntrays() { set_state( nn.altval( 0 ) == 0 ); }
-	~ntrays() { set_state(false); components.uninstall(); }
+	ntrays() { set_enabled(should_enable()); }
+	~ntrays() { set_enabled(false); components.uninstall(); }
 
 	bool run( size_t ) override
 	{
@@ -1552,11 +1567,11 @@ struct ntrays : plugmod_t
 AUTOHIDE NONE
 NtRays for Hex-Rays decompiler.
 State: %s)";
-		int code = ask_buttons( "~E~nable", "~D~isable", "~C~lose", -1, format + 1, nn.altval( 0 ) == 0 ? "Enabled" : "Disabled" );
+		int code = ask_buttons( "~E~nable", "~D~isable", "~C~lose", -1, format + 1, should_enable() ? "Enabled" : "Disabled" );
 		if ( code < 0 )
 			return true;
-		nn.altset( 0, code ? 0 : 1 );
-		set_state( code );
+		nn.altset( 0, code ? 2 : 1 );
+		set_enabled( code );
 		return true;
 	}
 };
